@@ -1,36 +1,33 @@
 """
-Configuration for RAG Complaint Chatbot
+Configuration settings for the RAG system
 """
-from pathlib import Path
 
-# Project paths
-PROJECT_ROOT = Path(__file__).parent.parent
-DATA_DIR = PROJECT_ROOT / "data" / "processed"
-VECTOR_STORE_DIR = PROJECT_ROOT / "vector_store" / "chroma_db"
-EMBEDDINGS_PATH = DATA_DIR / "complaint_embeddings.parquet"
-
-# Model configurations - CHANGED to smaller model
+# Embedding model
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-LLM_MODEL = "distilgpt2"  # Very small, CPU-friendly model
 
-# RAG parameters
+# Retrieval settings
 RETRIEVAL_K = 5
-SIMILARITY_THRESHOLD = 0.7
+MIN_CONFIDENCE_SCORE = 30
 
-# Product categories
-PRODUCT_CATEGORIES = [
-    "Credit Card",
-    "Personal Loan", 
-    "Savings account",
-    "Money transfers"
-]
+# Vector store settings
+VECTOR_STORE_DIR = "vector_store"
+COLLECTION_NAME = "complaint_embeddings"
 
-def print_config():
-    """Print current configuration"""
-    print("📋 RAG Configuration:")
-    print(f"   Project Root: {PROJECT_ROOT}")
-    print(f"   Vector Store: {VECTOR_STORE_DIR}")
-    print(f"   Embedding Model: {EMBEDDING_MODEL}")
-    print(f"   LLM Model: {LLM_MODEL} (CPU-friendly)")
-    print(f"   Retrieval K: {RETRIEVAL_K}")
-    print("✓ Configuration loaded")
+# Business intelligence settings
+BUSINESS_CONTEXTS = {
+    "urgent": ["urgent", "critical", "emergency", "immediate"],
+    "trending": ["trend", "pattern", "increase", "decrease", "over time"],
+    "comparative": ["compare", "vs", "versus", "difference", "better", "worse"],
+    "root_cause": ["why", "reason", "cause", "root", "source"],
+    "volume": ["many", "often", "frequent", "common", "typical"]
+}
+
+# Product categories mapping
+PRODUCT_CATEGORIES = {
+    "credit card": ["Credit card", "credit card", "Credit Card", "Credit-card"],
+    "personal loan": ["Personal loan", "personal loan", "Personal Loan", "Personal-loan"],
+    "savings account": ["Savings account", "savings account", "Savings Account", "Savings-account"],
+    "money transfers": ["Money transfers", "money transfers", "Money Transfers", "Money-transfers"],
+    "mortgage": ["Mortgage", "mortgage", "Home loan"],
+    "checking account": ["Checking account", "checking account", "Checking Account", "Checking-account"]
+}
