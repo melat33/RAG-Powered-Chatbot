@@ -348,9 +348,10 @@ json
 🎯 Task 4: Advanced Analytics & Deployment
 Advanced Features
 Predictive Analytics
+Dashboard ui 
 
-Complai![dash](https://github.com/user-attachments/assets/eef615a0-a0ba-44b1-bb4e-7cb2705bda5a)
-nt volume forecasting
+[dash](https://github.com/user-attachments/assets/eef615a0-a0ba-44b1-bb4e-7cb2705bda5a)
+
 
 Risk prediction models
 
@@ -418,6 +419,7 @@ Text Length: Median 763 characters, ideal for AI processing
 
 Sentiment Distribution: Mostly neutral with actionable insights
 
+
 Vocabulary Richness: Domain-specific terminology enables precise analysis
 
 Business Impact
@@ -441,4 +443,5 @@ pip install -r requirements.txt
 
 # 2. Start the application
 streamlit run app.py
+
 
