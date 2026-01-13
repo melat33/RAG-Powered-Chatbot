@@ -1,109 +1,82 @@
 """
-Advanced query understanding for financial complaints
+Query enhancement and understanding module
 """
-import re
-from typing import Dict, List, Optional
+from typing import Dict, List
+from .config import BUSINESS_CONTEXTS, PRODUCT_CATEGORIES
 
 class QueryEnhancer:
-    """Advanced query understanding with financial context"""
+    """Enhanced query understanding for business intelligence"""
     
-    # Financial product mapping
-    FINANCIAL_PRODUCTS = {
-        "credit card": ["credit card", "card", "credit", "visa", "mastercard", "amex"],
-        "personal loan": ["personal loan", "loan", "borrowing", "debt"],
-        "savings account": ["savings account", "savings", "account", "deposit"],
-        "money transfers": ["money transfer", "transfer", "wire", "send money", "remittance"]
-    }
-    
-    # Business intent mapping
-    BUSINESS_INTENTS = {
-        "analysis": ["what", "how many", "list", "show", "find"],
-        "comparison": ["compare", "vs", "versus", "difference", "similar"],
-        "root_cause": ["why", "reason", "cause", "root cause"],
-        "trend": ["trend", "pattern", "over time", "recent", "last"],
-        "urgency": ["urgent", "critical", "immediate", "emergency"]
-    }
-    
-    @staticmethod
-    def analyze_query(question: str) -> Dict:
-        """Comprehensive query analysis with financial context"""
+    def analyze_query(self, question: str) -> Dict:
+        """Deep analysis of business queries"""
         question_lower = question.lower()
         
-        analysis = {
-            "original": question,
-            "type": "general",
-            "products": [],
-            "business_intent": "analysis",
-            "time_period": None,
-            "urgency_level": "normal",
-            "expected_keywords": []
+        # Detect products
+        detected_products = []
+        for product_name, variations in PRODUCT_CATEGORIES.items():
+            if any(variation.lower() in question_lower for variation in variations):
+                detected_products.append(product_name.title())
+        
+        # Detect business context
+        business_context = {}
+        for context_type, keywords in BUSINESS_CONTEXTS.items():
+            business_context[context_type] = any(
+                keyword in question_lower for keyword in keywords
+            )
+        
+        # Determine query type
+        if business_context.get('comparative'):
+            query_type = "comparative"
+        elif business_context.get('trending'):
+            query_type = "trend_analysis"
+        elif business_context.get('root_cause'):
+            query_type = "root_cause"
+        elif detected_products:
+            query_type = "product_analysis"
+        else:
+            query_type = "general_analysis"
+        
+        return {
+            "original_query": question,
+            "products": detected_products,
+            "query_type": query_type,
+            "business_context": business_context,
+            "business_intent": self._determine_intent(question)
         }
-        
-        # Detect financial products
-        for product, keywords in QueryEnhancer.FINANCIAL_PRODUCTS.items():
-            if any(keyword in question_lower for keyword in keywords):
-                analysis["products"].append(product)
-        
-        # Detect business intent
-        for intent, keywords in QueryEnhancer.BUSINESS_INTENTS.items():
-            if any(keyword in question_lower for keyword in keywords):
-                analysis["business_intent"] = intent
-                analysis["type"] = intent
-                break
-        
-        # Detect urgency
-        if any(word in question_lower for word in ["urgent", "critical", "immediate"]):
-            analysis["urgency_level"] = "high"
-        
-        # Extract time period
-        time_patterns = [
-            (r"last (\d+) (days|weeks|months)", "recent"),
-            (r"in (\d{4})", "year_specific"),
-            (r"this (month|week|year)", "current"),
-            (r"q[1-4]", "quarter")
-        ]
-        
-        for pattern, period_type in time_patterns:
-            match = re.search(pattern, question_lower)
-            if match:
-                analysis["time_period"] = {"type": period_type, "value": match.group()}
-                break
-        
-        # Extract expected keywords
-        financial_keywords = ["fee", "charge", "fraud", "delay", "interest", 
-                            "rate", "service", "billing", "transfer", "loan"]
-        analysis["expected_keywords"] = [kw for kw in financial_keywords 
-                                       if kw in question_lower]
-        
-        return analysis
     
-    @staticmethod
-    def enhance_query(question: str, analysis: Dict) -> List[str]:
-        """Generate enhanced query variations for better retrieval"""
+    def enhance_query(self, question: str, analysis: Dict) -> List[str]:
+        """Create enhanced query variations"""
         enhanced = [question]
         
         # Add product-specific variations
         if analysis["products"]:
-            for product in analysis["products"]:
-                enhanced.append(f"{question} {product}")
+            for product in analysis["products"][:2]:  # Top 2 products
+                enhanced.append(f"{product} complaints {question}")
+                enhanced.append(f"customer issues with {product} {question}")
         
-        # Add intent-specific variations
-        if analysis["business_intent"] == "comparison":
-            enhanced.append(f"compare {question}")
-        elif analysis["business_intent"] == "root_cause":
-            enhanced.append(f"reason for {question}")
+        # Add context-based variations
+        if analysis["business_context"].get("urgent"):
+            enhanced.append(f"urgent critical {question}")
+        if analysis["business_context"].get("trending"):
+            enhanced.append(f"trend pattern {question}")
         
-        # Add keyword expansions
-        keyword_expansions = {
-            "fee": ["charge", "cost", "payment"],
-            "delay": ["slow", "late", "waiting"],
-            "fraud": ["unauthorized", "theft", "scam"],
-            "interest": ["rate", "percentage", "yield"]
-        }
+        # Add general business variations
+        enhanced.append(f"financial customer complaint analysis {question}")
+        enhanced.append(f"business intelligence {question}")
         
-        for original, expansions in keyword_expansions.items():
-            if original in question.lower():
-                for expansion in expansions[:2]:
-                    enhanced.append(question.lower().replace(original, expansion))
+        return enhanced[:5]  # Return top 5 enhanced queries
+    
+    def _determine_intent(self, question: str) -> str:
+        """Determine the business intent of the query"""
+        question_lower = question.lower()
         
-        return list(dict.fromkeys(enhanced))  # Remove duplicates
+        if any(word in question_lower for word in ["trend", "pattern", "increase", "decrease"]):
+            return "monitor_performance"
+        elif any(word in question_lower for word in ["compare", "vs", "versus", "difference"]):
+            return "competitive_analysis"
+        elif any(word in question_lower for word in ["why", "reason", "cause", "root"]):
+            return "root_cause_analysis"
+        elif any(word in question_lower for word in ["improve", "better", "fix", "solve"]):
+            return "process_improvement"
+        else:
+            return "insight_generation"
