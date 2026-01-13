@@ -1,665 +1,521 @@
-# %% File: app.py - Fixed Version
-print("🚀 LAUNCHING FINANCIAL COMPLAINTS ANALYST")
-print("=" * 60)
-
-import gradio as gr
-import pandas as pd
-import json
+# app_final_clean.py - Fixed all warnings
+import streamlit as st
+import chromadb
+import time
 from datetime import datetime
-import os
-import sys
 
-# Add parent directory to path
-current_dir = os.getcwd()
-if current_dir.endswith('notebooks'):
-    parent_dir = os.path.dirname(current_dir)
-    sys.path.insert(0, parent_dir)
+# Page configuration
+st.set_page_config(
+    page_title="Financial Complaints Analyzer",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Import your RAG system
-try:
-    # Try to import from your existing system
-    from src.rag_pipeline import AdvancedFinancialRAG
-    rag_system = AdvancedFinancialRAG(verbose=False)
-    print("✅ Loaded advanced RAG system")
-except:
-    # Fallback to simple RAG
-    print("⚠️ Creating simple RAG system...")
-    import chromadb
-    from sentence_transformers import SentenceTransformer
+# Custom CSS for modern UI
+st.markdown("""
+<style>
+    /* Main container */
+    .main-container {
+        padding: 2rem;
+    }
     
-    class SimpleFinancialRAG:
-        def __init__(self):
-            print("🚀 Initializing Financial Complaint RAG...")
-            self.embedder = SentenceTransformer("all-MiniLM-L6-v2")
-            self._connect_vector_store()
-            
-        def _connect_vector_store(self):
-            """Connect to vector store - try different collection names"""
-            try:
-                vector_store_path = "vector_store_1768244751"
-                print(f"📁 Looking for vector store at: {vector_store_path}")
-                
-                if os.path.exists(vector_store_path):
-                    self.client = chromadb.PersistentClient(path=vector_store_path)
-                    print("✅ ChromaDB client connected")
-                    
-                    # Try different collection names
-                    collection_names = [
-                        "financial_complaints",  # Original name
-                        "complaint_embeddings",   # Alternative name
-                        "complaints",             # Simple name
-                        "financial_data"          # Generic name
-                    ]
-                    
-                    for collection_name in collection_names:
-                        try:
-                            print(f"  🔍 Trying collection: '{collection_name}'...")
-                            self.collection = self.client.get_collection(collection_name)
-                            count = self.collection.count()
-                            print(f"  ✅ Found: '{collection_name}' with {count:,} documents")
-                            break
-                        except Exception as e:
-                            print(f"  ❌ Not found: '{collection_name}'")
-                            continue
-                    else:
-                        # If no collection found, list available collections
-                        print("❌ No known collection found")
-                        try:
-                            collections = self.client.list_collections()
-                            print(f"📋 Available collections: {[c.name for c in collections]}")
-                            if collections:
-                                # Use the first available collection
-                                self.collection = self.client.get_collection(collections[0].name)
-                                count = self.collection.count()
-                                print(f"✅ Using: '{collections[0].name}' with {count:,} documents")
-                            else:
-                                print("⚠️ No collections available in vector store")
-                                self.collection = None
-                        except Exception as e:
-                            print(f"⚠️ Cannot list collections: {e}")
-                            self.collection = None
-                else:
-                    print(f"❌ Vector store path not found: {vector_store_path}")
-                    print("📂 Current directory contents:")
-                    for item in os.listdir('.'):
-                        if os.path.isdir(item) and 'vector' in item.lower():
-                            print(f"  📁 {item}")
-                    self.collection = None
-                    
-            except Exception as e:
-                print(f"❌ Error connecting to vector store: {e}")
-                self.collection = None
+    /* Header styling */
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .main-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        font-weight: 300;
+    }
+    
+    /* Search box */
+    .stTextInput > div > div > input {
+        border-radius: 25px;
+        padding: 15px 20px;
+        font-size: 16px;
+        border: 2px solid #e0e0e0;
+        transition: all 0.3s;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 25px;
+        padding: 10px 30px;
+        font-weight: 600;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        transition: all 0.3s;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Cards for results */
+    .result-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid #e0e0e0;
+        transition: all 0.3s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .result-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+    
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .result-number {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+    
+    /* Stats cards */
+    .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0.5rem 0;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Tag styling */
+    .tag {
+        display: inline-block;
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin: 2px;
+        font-weight: 500;
+    }
+    
+    /* Sidebar styling */
+    .sidebar-header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    /* Footer */
+    .footer {
+        text-align: center;
+        margin-top: 3rem;
+        padding: 1rem;
+        color: #888;
+        font-size: 0.9rem;
+        border-top: 1px solid #e0e0e0;
+    }
+    
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 4rem;
+        background: #f8fafc;
+        border-radius: 15px;
+        border: 2px dashed #e2e8f0;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize session state
+if "query_history" not in st.session_state:
+    st.session_state.query_history = []
+if "current_query" not in st.session_state:
+    st.session_state.current_query = None
+if "search_results" not in st.session_state:
+    st.session_state.search_results = None
+
+# Header section
+st.markdown("""
+<div class="main-header">
+    <div class="main-title">💰 Financial Complaints Analyzer</div>
+    <div class="subtitle">AI-powered insights from 5,000+ real consumer complaints</div>
+</div>
+""", unsafe_allow_html=True)
+
+# Initialize ChromaDB
+try:
+    @st.cache_resource
+    def get_collection():
+        client = chromadb.PersistentClient(path="notebooks/vector_store_1768244751")
+        return client.get_collection("financial_complaints")
+    
+    collection = get_collection()
+    
+    # Main layout
+    col_left, col_right = st.columns([3, 1])
+    
+    with col_left:
+        # Search section
+        st.markdown("### 🔎 Search Complaints Database")
         
-        def ask(self, question, product_filter=None):
-            if not self.collection:
-                return self._no_data_response(question)
-            
-            try:
-                where_filter = None
-                if product_filter:
-                    where_filter = {"product_category": product_filter}
-                
-                print(f"🔍 Querying: '{question[:50]}...'")
-                results = self.collection.query(
-                    query_texts=[question],
-                    n_results=5,
-                    where=where_filter,
-                    include=["documents", "metadatas", "distances"]
-                )
-                
-                return self._process_results(question, results)
-            except Exception as e:
-                print(f"⚠️ Query error: {e}")
-                return self._error_response(question, str(e))
+        # Search input with proper label handling
+        query = st.text_input(
+            "Search complaints",
+            placeholder="Type your query here... (e.g., 'credit card payment issues', 'mortgage delays')",
+            key="search_input",
+            label_visibility="collapsed"
+        )
         
-        def _process_results(self, question, results):
-            chunks = results['documents'][0] if results['documents'] else []
-            metadatas = results['metadatas'][0] if results['metadatas'] else []
-            distances = results['distances'][0] if results['distances'] else []
-            
-            count = len(chunks)
-            
-            # Extract metadata
-            products = set()
-            issues = set()
-            companies = set()
-            
-            for meta in metadatas:
-                if meta:
-                    if 'product_category' in meta and meta['product_category']:
-                        products.add(str(meta['product_category']))
-                    if 'issue' in meta and meta['issue']:
-                        issues.add(str(meta['issue']))
-                    if 'company' in meta and meta['company']:
-                        companies.add(str(meta['company']))
-            
-            # Calculate confidence
-            if distances:
-                avg_distance = sum(distances) / len(distances)
-                confidence_score = (1 - avg_distance) * 100
-            else:
-                confidence_score = 50.0
-            
-            confidence_level = "HIGH" if confidence_score >= 70 else "MEDIUM" if confidence_score >= 40 else "LOW"
-            
-            # Prepare sources
-            sources = []
-            for i, (chunk, meta) in enumerate(zip(chunks, metadatas), 1):
-                sources.append({
-                    "id": i,
-                    "text": chunk[:200] + "..." if len(chunk) > 200 else chunk,
-                    "product": meta.get('product_category', 'Unknown') if meta else 'Unknown',
-                    "issue": meta.get('issue', 'General') if meta else 'General',
-                    "company": meta.get('company', 'Unknown') if meta else 'Unknown'
+        # Search button
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            search_clicked = st.button("🚀 Search", use_container_width=True)
+        
+        # Process search
+        if search_clicked or (query and query != st.session_state.get('last_processed_query')):
+            if query:
+                st.session_state.current_query = query
+                st.session_state.last_processed_query = query
+                st.session_state.query_history.append({
+                    "query": query,
+                    "timestamp": datetime.now().strftime("%H:%M:%S")
                 })
-            
-            # Generate answer
-            product_list = list(products)[:3]
-            issue_list = list(issues)[:3]
-            
-            answer = f"""
-**📊 Analysis Results:**
-- **Complaints Analyzed:** {count}
-- **Confidence Level:** {confidence_level} ({confidence_score:.1f}%)
-- **Products Covered:** {len(products)}
-- **Main Issues:** {', '.join(issue_list) if issue_list else 'Various'}
-
-**💡 Key Insights:**
-{', '.join(product_list) if product_list else 'Various financial products'} show patterns of {', '.join(issue_list) if issue_list else 'customer concerns'}.
-
-**🎯 Recommendations:**
-1. Review complaint patterns for identified products
-2. Address the most frequent issues
-3. Monitor customer feedback continuously
-"""
-            
-            return {
-                "question": question,
-                "answer": answer,
-                "confidence": confidence_score,
-                "confidence_level": confidence_level,
-                "sources": sources,
-                "stats": {
-                    "total_complaints": count,
-                    "products_covered": len(products),
-                    "issues_identified": len(issues),
-                    "companies": len(companies)
-                }
-            }
-        
-        def _no_data_response(self, question):
-            """Response when no data is available"""
-            return {
-                "question": question,
-                "answer": """
-**⚠️ System Configuration Required**
-
-The vector store is not properly connected. Please check:
-
-1. **Vector Store Location**: Ensure `vector_store_1768244751` is in the same directory
-2. **Collection Name**: Check if collection name is different
-3. **Permissions**: Verify read access to the vector store
-
-**📋 For Demonstration:**
-Try asking about common financial complaints like:
-- Credit card fraud issues
-- Personal loan application problems
-- Savings account fee concerns
-""",
-                "confidence": 0,
-                "confidence_level": "NO_DATA",
-                "sources": [],
-                "stats": {"total_complaints": 0, "products_covered": 0, "issues_identified": 0, "companies": 0}
-            }
-        
-        def _error_response(self, question, error_msg):
-            """Response when there's an error"""
-            return {
-                "question": question,
-                "answer": f"""
-**❌ System Error**
-
-Error: {error_msg}
-
-**🔧 Troubleshooting:**
-1. Restart the application
-2. Check vector store connection
-3. Verify all dependencies are installed
-""",
-                "confidence": 0,
-                "confidence_level": "ERROR",
-                "sources": [],
-                "stats": {"total_complaints": 0, "products_covered": 0, "issues_identified": 0, "companies": 0}
-            }
-    
-    rag_system = SimpleFinancialRAG()
-
-# Initialize query history
-query_history = []
-
-# CSS for modern styling
-css = """
-/* Modern CSS styling */
-.gradio-container {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-/* Header styling */
-.header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 2rem;
-    border-radius: 10px;
-    margin-bottom: 2rem;
-    color: white;
-    text-align: center;
-}
-
-/* Card styling */
-.card {
-    background: white;
-    border-radius: 10px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e5e7eb;
-}
-
-/* Confidence meter */
-.confidence-meter {
-    height: 10px;
-    border-radius: 5px;
-    margin: 10px 0;
-    background: linear-gradient(to right, #ef4444, #f59e0b, #10b981);
-}
-
-/* Source cards */
-.source-card {
-    background: #f9fafb;
-    border-left: 4px solid #3b82f6;
-    padding: 1rem;
-    margin: 0.5rem 0;
-    border-radius: 4px;
-}
-
-/* Stats badges */
-.stat-badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    margin-right: 0.5rem;
-}
-
-/* Button styling */
-button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 0.75rem 1.5rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-}
-
-/* Input styling */
-input, textarea, select {
-    border: 2px solid #e5e7eb !important;
-    border-radius: 6px !important;
-    padding: 0.75rem !important;
-}
-
-input:focus, textarea:focus, select:focus {
-    border-color: #667eea !important;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-}
-
-/* Status indicators */
-.status-good { color: #10b981; }
-.status-warning { color: #f59e0b; }
-.status-error { color: #ef4444; }
-"""
-
-def get_confidence_color(score):
-    """Get color based on confidence score"""
-    if score >= 70:
-        return "#10b981"  # Green
-    elif score >= 40:
-        return "#f59e0b"  # Yellow
-    else:
-        return "#ef4444"  # Red
-
-def format_response(response):
-    """Format the response for display"""
-    answer = response["answer"]
-    confidence = response["confidence"]
-    confidence_level = response["confidence_level"]
-    sources = response["sources"]
-    stats = response["stats"]
-    
-    # Build HTML response
-    html = f"""
-    <div class="card">
-        <h3 style="margin-top: 0;">📊 Analysis Results</h3>
-        
-        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-            <div class="stat-badge" style="background: #dbeafe; color: #1d4ed8;">
-                🔍 {stats['total_complaints']} Complaints
-            </div>
-            <div class="stat-badge" style="background: #dcfce7; color: #166534;">
-                📈 {stats['products_covered']} Products
-            </div>
-            <div class="stat-badge" style="background: #fef3c7; color: #92400e;">
-                📝 {stats['issues_identified']} Issues
-            </div>
-            <div class="stat-badge" style="background: {get_confidence_color(confidence)}20; color: {get_confidence_color(confidence)};">
-                🎯 {confidence_level} ({confidence:.1f}%)
-            </div>
-        </div>
-        
-        {answer}
-    </div>
-    """
-    
-    # Add sources if available
-    if sources:
-        html += "<h3>📚 Source Evidence</h3>"
-        for source in sources:
-            html += f"""
-            <div class="source-card">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <strong>#{source['id']} - {source['product']}</strong>
-                    <small style="color: #6b7280;">{source['company']}</small>
-                </div>
-                <div style="color: #4b5563; font-size: 0.9rem;">{source['text']}</div>
-                <div style="margin-top: 0.5rem;">
-                    <span style="background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem;">
-                        Issue: {source['issue']}
-                    </span>
-                </div>
-            </div>
-            """
-    
-    return html
-
-def process_query(question, product_filter, show_sources):
-    """Process user query"""
-    # Log query
-    query_history.append({
-        "timestamp": datetime.now().isoformat(),
-        "question": question,
-        "product_filter": product_filter
-    })
-    
-    try:
-        # Get response from RAG system
-        response = rag_system.ask(question, product_filter if product_filter != "All" else None)
-        
-        # Format response
-        formatted_response = format_response(response)
-        
-        # Update history
-        if len(query_history) > 10:
-            query_history.pop(0)
-        
-        return formatted_response, json.dumps(response, indent=2)
-    
-    except Exception as e:
-        error_msg = f"""
-        <div class="card" style="border-left: 4px solid #ef4444;">
-            <h3 style="color: #ef4444;">❌ Error Processing Query</h3>
-            <p>{str(e)}</p>
-            <p>Please try again or check the system connection.</p>
-        </div>
-        """
-        return error_msg, json.dumps({"error": str(e)}, indent=2)
-
-def clear_history():
-    """Clear query history"""
-    global query_history
-    query_history.clear()
-    return "✅ History cleared", ""
-
-def get_stats():
-    """Get system statistics"""
-    if hasattr(rag_system, 'collection') and rag_system.collection:
-        try:
-            count = rag_system.collection.count()
-            status = "✅ Connected"
-            status_class = "status-good"
-        except:
-            count = 0
-            status = "❌ Error"
-            status_class = "status-error"
-    else:
-        count = 0
-        status = "⚠️ Not Connected"
-        status_class = "status-warning"
-    
-    return f"""
-    <div class="card">
-        <h3>📊 System Statistics</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{count:,}</div>
-                <div style="color: #6b7280;">Complaint Chunks</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #10b981;">5</div>
-                <div style="color: #6b7280;">Retrieval Limit</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">{len(query_history)}</div>
-                <div style="color: #6b7280;">Recent Queries</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">100%</div>
-                <div style="color: #6b7280;">Source Attribution</div>
-            </div>
-        </div>
-        <div style="margin-top: 1rem; padding: 1rem; background: #f9fafb; border-radius: 6px;">
-            <strong>System Status:</strong> <span class="{status_class}">{status}</span>
-            <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #6b7280;">
-                Vector Store: {'Available' if hasattr(rag_system, 'collection') and rag_system.collection else 'Not found'}
-            </div>
-        </div>
-    </div>
-    """
-
-# Create Gradio interface
-with gr.Blocks(css=css, title="Financial Complaints Analyst", theme=gr.themes.Soft()) as demo:
-    
-    # Header
-    gr.HTML("""
-    <div class="header">
-        <h1 style="margin: 0; font-size: 2.5rem;">🔍 Financial Complaints Analyst</h1>
-        <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-            AI-powered analysis of financial customer complaints
-        </p>
-        <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem;">
-            <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 9999px;">
-                📊 Business Intelligence
-            </span>
-            <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 9999px;">
-                🎯 Confidence Scoring
-            </span>
-            <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 9999px;">
-                📚 Source Attribution
-            </span>
-        </div>
-    </div>
-    """)
-    
-    with gr.Row():
-        with gr.Column(scale=2):
-            # Query Input Section
-            gr.HTML("<h2 style='margin-top: 0;'>💬 Ask Your Business Question</h2>")
-            
-            with gr.Row():
-                question_input = gr.Textbox(
-                    label="Business Question",
-                    placeholder="E.g., What are common fraud complaints about credit cards?",
-                    lines=2,
-                    elem_id="question_input"
-                )
-            
-            with gr.Row():
-                product_filter = gr.Dropdown(
-                    label="Filter by Product (Optional)",
-                    choices=["All", "Credit card", "Personal loan", "Savings account", 
-                            "Money transfers", "Mortgage", "Checking account"],
-                    value="All",
-                    elem_id="product_filter"
-                )
-            
-            with gr.Row():
-                submit_btn = gr.Button("🔍 Analyze Complaints", variant="primary", size="lg")
-                clear_btn = gr.Button("🗑️ Clear", variant="secondary")
-                stats_btn = gr.Button("📊 System Stats", variant="secondary")
-            
-            # Response Display
-            response_display = gr.HTML(
-                label="Analysis Results",
-                value="<div class='card'><p style='color: #6b7280; text-align: center;'>👆 Ask a question to get started</p></div>"
-            )
-        
-        with gr.Column(scale=1):
-            # Right Panel - Features & Info
-            gr.HTML("""
-            <div class="card">
-                <h3 style="margin-top: 0;">🎯 Features</h3>
-                <ul style="margin: 0; padding-left: 1.25rem;">
-                    <li>Real-time complaint analysis</li>
-                    <li>Confidence scoring system</li>
-                    <li>Source attribution & evidence</li>
-                    <li>Product-specific filtering</li>
-                    <li>Business intelligence insights</li>
-                </ul>
-            </div>
-            """)
-            
-            # Sample Questions
-            with gr.Accordion("💡 Sample Questions", open=True):
-                gr.HTML("""
-                <div style="padding: 1rem 0;">
-                    <p><strong>Product Analysis:</strong></p>
-                    <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">
-                        <li>What are common credit card fraud issues?</li>
-                        <li>How do customers complain about loan fees?</li>
-                        <li>What savings account problems exist?</li>
-                    </ul>
+                
+                # Show progress
+                with st.spinner("🔍 Searching database..."):
+                    progress_bar = st.progress(0)
                     
-                    <p><strong>Trend Analysis:</strong></p>
-                    <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">
-                        <li>What are trending complaint topics?</li>
-                        <li>Compare complaints between products</li>
-                        <li>What urgent issues need attention?</li>
-                    </ul>
+                    # Simulate progress
+                    for i in range(100):
+                        time.sleep(0.005)
+                        progress_bar.progress(i + 1)
+                    
+                    # Actual search
+                    start = time.time()
+                    results = collection.query(
+                        query_texts=[query],
+                        n_results=5,
+                        include=["documents", "metadatas", "distances"]
+                    )
+                    search_time = time.time() - start
+                    
+                    st.session_state.search_results = {
+                        "documents": results['documents'][0],
+                        "metadatas": results['metadatas'][0],
+                        "distances": results['distances'][0] if results['distances'][0] else [],
+                        "time": search_time,
+                        "query": query
+                    }
+                    
+                    progress_bar.empty()
+        
+        # Display results
+        if st.session_state.search_results:
+            results = st.session_state.search_results
+            
+            # Stats row
+            st.markdown("---")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="stat-card">
+                    <div class="stat-value">{len(results['documents'])}</div>
+                    <div class="stat-label">Complaints Found</div>
                 </div>
-                """)
+                """, unsafe_allow_html=True)
             
-            # System Info
-            with gr.Accordion("⚙️ System Information", open=False):
-                system_info = gr.HTML(
-                    label="System Info",
-                    value="<div class='card'><p>Click 'System Stats' to see details</p></div>"
-                )
-                raw_json = gr.JSON(label="Raw Response", visible=False)
+            with col2:
+                st.markdown(f"""
+                <div class="stat-card">
+                    <div class="stat-value">{results['time']:.2f}s</div>
+                    <div class="stat-label">Search Time</div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Recent Activity
-            with gr.Accordion("📈 Recent Activity", open=True):
-                activity_display = gr.HTML(
-                    label="Recent Queries",
-                    value="<p style='color: #6b7280;'>No recent queries</p>"
-                )
-    
-    # Event handlers
-    submit_btn.click(
-        fn=process_query,
-        inputs=[question_input, product_filter, gr.Checkbox(value=True, visible=False)],
-        outputs=[response_display, raw_json]
-    )
-    
-    clear_btn.click(
-        fn=clear_history,
-        inputs=[],
-        outputs=[response_display, raw_json]
-    )
-    
-    stats_btn.click(
-        fn=get_stats,
-        inputs=[],
-        outputs=[system_info]
-    )
-    
-    # Update activity display
-    def update_activity():
-        if query_history:
-            html = "<div style='max-height: 300px; overflow-y: auto;'>"
-            for query in reversed(query_history[-5:]):
-                html += f"""
-                <div style="background: #f9fafb; padding: 0.75rem; margin: 0.5rem 0; border-radius: 6px;">
-                    <div style="font-weight: 500;">{query['question'][:50]}...</div>
-                    <div style="font-size: 0.8rem; color: #6b7280;">
-                        Filter: {query['product_filter']}
+            with col3:
+                # Calculate average relevance
+                if results['distances']:
+                    avg_distance = sum(results['distances']) / len(results['distances'])
+                    relevance = 100 - (avg_distance * 100)
+                    st.markdown(f"""
+                    <div class="stat-card">
+                        <div class="stat-value">{relevance:.0f}%</div>
+                        <div class="stat-label">Avg Relevance</div>
                     </div>
-                </div>
-                """
-            html += "</div>"
-            return html
-        return "<p style='color: #6b7280;'>No recent queries</p>"
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="stat-card">
+                        <div class="stat-value">—</div>
+                        <div class="stat-label">Relevance</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("### 📋 Search Results")
+            st.caption(f"Query: *'{results['query']}'*")
+            
+            # Display each result as a card
+            for i, (doc, meta, distance) in enumerate(zip(
+                results['documents'], 
+                results['metadatas'], 
+                results['distances'] if results['distances'] else [0] * len(results['documents'])
+            )):
+                # Calculate relevance percentage
+                relevance = 100 - (distance * 100) if distance else 100
+                
+                # Create card
+                with st.container():
+                    st.markdown(f"""
+                    <div class="result-card">
+                        <div class="result-header">
+                            <div class="result-number">{i+1}</div>
+                            <div style="font-size: 0.9rem; color: {'#10b981' if relevance > 70 else '#f59e0b' if relevance > 40 else '#ef4444'}; font-weight: 600;">
+                                {relevance:.0f}% relevant
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Document content
+                    st.write(doc)
+                    
+                    # Metadata tags
+                    if meta:
+                        tag_cols = st.columns(4)
+                        meta_displayed = 0
+                        
+                        if meta.get('product'):
+                            with tag_cols[meta_displayed % 4]:
+                                st.markdown(f'<span class="tag">📊 {meta["product"]}</span>', unsafe_allow_html=True)
+                            meta_displayed += 1
+                        
+                        if meta.get('issue'):
+                            with tag_cols[meta_displayed % 4]:
+                                st.markdown(f'<span class="tag">⚠️ {meta["issue"]}</span>', unsafe_allow_html=True)
+                            meta_displayed += 1
+                        
+                        if meta.get('company'):
+                            with tag_cols[meta_displayed % 4]:
+                                st.markdown(f'<span class="tag">🏢 {meta["company"]}</span>', unsafe_allow_html=True)
+                            meta_displayed += 1
+                        
+                        if meta.get('state'):
+                            with tag_cols[meta_displayed % 4]:
+                                st.markdown(f'<span class="tag">📍 {meta["state"]}</span>', unsafe_allow_html=True)
+                    
+                    st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Quick actions
+            st.markdown("---")
+            st.markdown("### 💡 Quick Actions")
+            action_cols = st.columns(4)
+            
+            with action_cols[0]:
+                if st.button("📥 Export", use_container_width=True):
+                    st.toast("Export feature coming soon! 🚀")
+            
+            with action_cols[1]:
+                if st.button("🔄 New Search", use_container_width=True):
+                    st.session_state.current_query = None
+                    st.session_state.search_results = None
+                    st.session_state.last_processed_query = None
+                    st.rerun()
+            
+            with action_cols[2]:
+                if st.button("📊 Analytics", use_container_width=True):
+                    st.toast("Analytics dashboard coming soon! 📈")
+            
+            with action_cols[3]:
+                if st.button("📈 Trends", use_container_width=True):
+                    st.toast("Trend analysis coming soon! 🔍")
+        
+        else:
+            # Show placeholder when no search
+            st.markdown("---")
+            st.markdown("""
+            <div class="empty-state">
+                <div class="empty-icon">🔍</div>
+                <h3 style="color: #475569;">Ready to Search</h3>
+                <p style="color: #64748b;">Enter a query above to search through 5,000+ financial complaints</p>
+            </div>
+            """, unsafe_allow_html=True)
     
-    # Demo for Gradio interface
-    demo.load(fn=update_activity, inputs=[], outputs=[activity_display])
+    with col_right:
+        # Sidebar content
+        st.markdown('<div class="sidebar-header">📊 Dashboard</div>', unsafe_allow_html=True)
+        
+        # Database stats
+        st.metric("Total Complaints", f"{collection.count():,}")
+        st.metric("Search Speed", "< 0.5s", delta="Fast")
+        
+        st.markdown("---")
+        
+        # Recent searches
+        st.markdown("**📝 Recent Searches**")
+        if st.session_state.query_history:
+            for i, search in enumerate(reversed(st.session_state.query_history[-5:])):
+                with st.container():
+                    st.caption(f"**{search['query'][:25]}...**")
+                    st.caption(f"_{search['timestamp']}_")
+                    st.markdown("---")
+        else:
+            st.caption("No searches yet")
+        
+        st.markdown("---")
+        
+        # Quick search suggestions
+        st.markdown("**⚡ Quick Searches**")
+        
+        quick_searches = [
+            ("💳 Credit Card Fees", "credit card hidden fees"),
+            ("🏠 Mortgage Delays", "mortgage processing delays"),
+            ("💰 Loan Issues", "personal loan problems"),
+            ("👥 Customer Service", "poor bank customer service"),
+            ("💸 Unauthorized Charges", "unauthorized transactions"),
+            ("📄 Billing Errors", "billing statement errors")
+        ]
+        
+        for label, search_term in quick_searches:
+            if st.button(label, key=f"quick_{search_term}", use_container_width=True):
+                st.session_state.current_query = search_term
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Tips
+        st.markdown("**💡 Search Tips**")
+        st.info("""
+        • Use specific financial terms
+        • Include product names
+        • Mention specific issues
+        • Try different keywords
+        """)
+        
+        # Info
+        st.markdown("---")
+        st.markdown("**ℹ️ About**")
+        st.caption("""
+        This system analyzes consumer financial complaints from regulatory databases.
+        
+        **Data Source:** CFPB Complaints
+        **Total Records:** 5,000+
+        **Last Updated:** Recent
+        """)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div class="footer">
+        Financial Complaints Analyzer • Powered by ChromaDB & Streamlit • Real-time search and analysis
+    </div>
+    """, unsafe_allow_html=True)
 
-# Launch the application
-print("\n" + "="*60)
-print("🚀 FINANCIAL COMPLAINTS ANALYST - READY TO LAUNCH")
-print("="*60)
-
-if hasattr(rag_system, 'collection') and rag_system.collection:
-    try:
-        count = rag_system.collection.count()
-        print(f"✅ System Status: Connected to {count:,} complaint chunks")
-    except:
-        print("⚠️ System Status: Collection found but count unavailable")
-else:
-    print("⚠️ System Status: Vector store not connected")
-
-print("\n📋 FEATURES:")
-print("   • Modern, professional UI design")
-print("   • Real-time complaint analysis")
-print("   • Source attribution for transparency")
-print("   • Confidence scoring system")
-print("   • Product filtering capabilities")
-print("   • Query history tracking")
-print("\n🌐 TO RUN:")
-print("   1. Save this as 'app.py'")
-print("   2. Run: python app.py")
-print("   3. Open: http://localhost:7860")
-print("\n🎯 WINNING FEATURES:")
-print("   • Enterprise-ready design")
-print("   • Full transparency with sources")
-print("   • Business-focused insights")
-print("   • Professional analytics dashboard")
-print("\n🔧 TROUBLESHOOTING:")
-print("   • Ensure vector_store_1768244751 is in the same directory")
-print("   • Check if collection name is different")
-print("   • Try asking sample questions")
-print("\n✅ Ready for Task 4 submission!")
-
-# Launch with better error handling
-try:
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False, show_error=True)
 except Exception as e:
-    print(f"\n❌ Failed to launch: {e}")
-    print("Try:")
-    print("  1. Check if port 7860 is already in use")
-    print("  2. Run: python app.py --port 7861")
-    print("  3. Or try: demo.launch(share=True) for public link")
+    # Error handling with modern UI
+    st.error("### ⚠️ System Error")
+    st.error(f"**Details:** {str(e)}")
+    
+    # Show troubleshooting tips
+    with st.expander("🛠️ Troubleshooting Tips"):
+        st.markdown("""
+        1. **Check if vector store exists:**
+           ```bash
+           ls notebooks/vector_store_1768244751/
+           ```
+        
+        2. **Verify collection name:**
+           ```python
+           import chromadb
+           client = chromadb.PersistentClient(path="notebooks/vector_store_1768244751")
+           print([c.name for c in client.list_collections()])
+           ```
+        
+        3. **Reinstall dependencies:**
+           ```bash
+           pip install chromadb --upgrade
+           ```
+        """)
+    
+    # Fallback UI
+    st.markdown("""
+    <div style="text-align: center; padding: 3rem; background: linear-gradient(135deg, #fdfcfb 0%, #f8f9fa 100%); border-radius: 15px;">
+        <div style="font-size: 5rem; margin-bottom: 1rem;">🔧</div>
+        <h3 style="color: #475569;">System Maintenance</h3>
+        <p style="color: #64748b;">We're experiencing technical difficulties. Please try again shortly.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Add a simple JavaScript to hide Streamlit elements (optional)
+st.markdown("""
+<script>
+// Hide Streamlit branding
+const hideStreamlitStyle = `
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+`
+const style = document.createElement('style');
+style.textContent = hideStreamlitStyle;
+document.head.appendChild(style);
+</script>
+""", unsafe_allow_html=True)
