@@ -1,9 +1,7 @@
 """
 Utility functions for the RAG system
 """
-import pandas as pd
 from typing import List, Dict
-from src.config import *
 
 def load_sample_questions() -> List[Dict]:
     """Load sample questions for demonstration"""
@@ -19,15 +17,15 @@ def load_sample_questions() -> List[Dict]:
         {
             "category": "Trend Analysis", 
             "questions": [
-                "What are trending complaint topics this month?",
-                "How have fraud complaints changed over time?",
-                "Are billing complaints increasing or decreasing?"
+                "What are trending complaint topics?",
+                "How have fraud complaints changed?",
+                "Are billing complaints increasing?"
             ]
         },
         {
             "category": "Comparison",
             "questions": [
-                "Compare customer satisfaction between products",
+                "Compare complaints between products",
                 "Which product has the most urgent complaints?",
                 "How do complaint volumes differ by product?"
             ]
@@ -45,7 +43,7 @@ def analyze_response_quality(response: Dict) -> Dict:
         "has_sources": response.get("source_count", 0) > 0
     }
     
-    # Quality score calculation
+    # Quality score calculation (0-6)
     quality_score = 0
     if quality_metrics["has_answer"]:
         quality_score += 2
@@ -59,3 +57,16 @@ def analyze_response_quality(response: Dict) -> Dict:
     quality_metrics["quality_score"] = quality_score
     
     return quality_metrics
+
+def format_for_display(response: Dict, max_length: int = 200) -> str:
+    """Format response for clean display"""
+    if not response.get('business_insights'):
+        return "No response generated"
+    
+    insights = response['business_insights']
+    summary = insights.get('executive_summary', '')
+    
+    if len(summary) > max_length:
+        summary = summary[:max_length] + "..."
+    
+    return summary
