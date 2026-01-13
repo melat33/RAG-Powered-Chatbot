@@ -1,72 +1,51 @@
-"""
-Utility functions for the RAG system
-"""
-from typing import List, Dict
+import os
+import json
+from datetime import datetime
+import numpy as np
 
-def load_sample_questions() -> List[Dict]:
-    """Load sample questions for demonstration"""
-    return [
-        {
-            "category": "Product Analysis",
-            "questions": [
-                "What are the top complaints about credit cards?",
-                "Why do customers complain about savings accounts?",
-                "What issues are specific to personal loans?"
-            ]
-        },
-        {
-            "category": "Trend Analysis", 
-            "questions": [
-                "What are trending complaint topics?",
-                "How have fraud complaints changed?",
-                "Are billing complaints increasing?"
-            ]
-        },
-        {
-            "category": "Comparison",
-            "questions": [
-                "Compare complaints between products",
-                "Which product has the most urgent complaints?",
-                "How do complaint volumes differ by product?"
-            ]
-        }
-    ]
-
-def analyze_response_quality(response: Dict) -> Dict:
-    """Analyze quality metrics of a response"""
+def save_data_quality_report(df, report_path):
+    """Save data quality report"""
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(report_path), exist_ok=True)
     
-    quality_metrics = {
-        "has_answer": len(response.get("answer", "")) > 0,
-        "answer_length": len(response.get("answer", "")),
-        "source_count": response.get("source_count", 0),
-        "confidence": response.get("confidence", 0),
-        "has_sources": response.get("source_count", 0) > 0
+    report = {
+        'generated_at': datetime.now().isoformat(),
+        'dataset_info': {
+            'total_records': int(len(df)),  # Convert to int
+            'columns': list(df.columns),
+            'dtypes': {col: str(dtype) for col, dtype in df.dtypes.items()}
+        },
+        'completeness': {
+            col: {
+                'non_null': int(df[col].notna().sum()),  # Convert to int
+                'null': int(df[col].isna().sum()),  # Convert to int
+                'completeness_percentage': float(round((df[col].notna().sum() / len(df)) * 100, 2))  # Convert to float
+            }
+            for col in df.columns
+        }
     }
     
-    # Quality score calculation (0-6)
-    quality_score = 0
-    if quality_metrics["has_answer"]:
-        quality_score += 2
-    if quality_metrics["has_sources"]:
-        quality_score += 2
-    if quality_metrics["confidence"] > 0.5:
-        quality_score += 1
-    if 100 < quality_metrics["answer_length"] < 500:
-        quality_score += 1
+    # Handle numeric columns summary - simplified version
+    numeric_cols = df.select_dtypes(include=['int64', 'float64'])
+    if not numeric_cols.empty:
+        summary_stats = {}
+        for col in numeric_cols.columns:
+            summary_stats[col] = {
+                'count': int(numeric_cols[col].count()),
+                'mean': float(numeric_cols[col].mean()),
+                'std': float(numeric_cols[col].std()),
+                'min': float(numeric_cols[col].min()),
+                '25%': float(numeric_cols[col].quantile(0.25)),
+                '50%': float(numeric_cols[col].quantile(0.50)),
+                '75%': float(numeric_cols[col].quantile(0.75)),
+                'max': float(numeric_cols[col].max())
+            }
+        report['summary_stats'] = summary_stats
+    else:
+        report['summary_stats'] = {}
     
-    quality_metrics["quality_score"] = quality_score
+    with open(report_path, 'w') as f:
+        json.dump(report, f, indent=2)
     
-    return quality_metrics
-
-def format_for_display(response: Dict, max_length: int = 200) -> str:
-    """Format response for clean display"""
-    if not response.get('business_insights'):
-        return "No response generated"
-    
-    insights = response['business_insights']
-    summary = insights.get('executive_summary', '')
-    
-    if len(summary) > max_length:
-        summary = summary[:max_length] + "..."
-    
-    return summary
+    print(f"📋 Data quality report saved: {report_path}")
+    return report
