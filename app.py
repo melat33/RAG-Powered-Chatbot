@@ -1,4 +1,4 @@
-# %% File: app.py - Modern Gradio Interface
+# %% File: app.py - Fixed Version
 print("🚀 LAUNCHING FINANCIAL COMPLAINTS ANALYST")
 print("=" * 60)
 
@@ -34,25 +34,72 @@ except:
             self._connect_vector_store()
             
         def _connect_vector_store(self):
+            """Connect to vector store - try different collection names"""
             try:
                 vector_store_path = "vector_store_1768244751"
-                self.client = chromadb.PersistentClient(path=vector_store_path)
-                self.collection = self.client.get_collection("financial_complaints")
-                count = self.collection.count()
-                print(f"✅ Connected: {count:,} complaint chunks")
+                print(f"📁 Looking for vector store at: {vector_store_path}")
+                
+                if os.path.exists(vector_store_path):
+                    self.client = chromadb.PersistentClient(path=vector_store_path)
+                    print("✅ ChromaDB client connected")
+                    
+                    # Try different collection names
+                    collection_names = [
+                        "financial_complaints",  # Original name
+                        "complaint_embeddings",   # Alternative name
+                        "complaints",             # Simple name
+                        "financial_data"          # Generic name
+                    ]
+                    
+                    for collection_name in collection_names:
+                        try:
+                            print(f"  🔍 Trying collection: '{collection_name}'...")
+                            self.collection = self.client.get_collection(collection_name)
+                            count = self.collection.count()
+                            print(f"  ✅ Found: '{collection_name}' with {count:,} documents")
+                            break
+                        except Exception as e:
+                            print(f"  ❌ Not found: '{collection_name}'")
+                            continue
+                    else:
+                        # If no collection found, list available collections
+                        print("❌ No known collection found")
+                        try:
+                            collections = self.client.list_collections()
+                            print(f"📋 Available collections: {[c.name for c in collections]}")
+                            if collections:
+                                # Use the first available collection
+                                self.collection = self.client.get_collection(collections[0].name)
+                                count = self.collection.count()
+                                print(f"✅ Using: '{collections[0].name}' with {count:,} documents")
+                            else:
+                                print("⚠️ No collections available in vector store")
+                                self.collection = None
+                        except Exception as e:
+                            print(f"⚠️ Cannot list collections: {e}")
+                            self.collection = None
+                else:
+                    print(f"❌ Vector store path not found: {vector_store_path}")
+                    print("📂 Current directory contents:")
+                    for item in os.listdir('.'):
+                        if os.path.isdir(item) and 'vector' in item.lower():
+                            print(f"  📁 {item}")
+                    self.collection = None
+                    
             except Exception as e:
-                print(f"❌ Error: {e}")
+                print(f"❌ Error connecting to vector store: {e}")
                 self.collection = None
         
         def ask(self, question, product_filter=None):
             if not self.collection:
-                return self._demo_response(question)
+                return self._no_data_response(question)
             
             try:
                 where_filter = None
                 if product_filter:
                     where_filter = {"product_category": product_filter}
                 
+                print(f"🔍 Querying: '{question[:50]}...'")
                 results = self.collection.query(
                     query_texts=[question],
                     n_results=5,
@@ -62,7 +109,8 @@ except:
                 
                 return self._process_results(question, results)
             except Exception as e:
-                return self._demo_response(question)
+                print(f"⚠️ Query error: {e}")
+                return self._error_response(question, str(e))
         
         def _process_results(self, question, results):
             chunks = results['documents'][0] if results['documents'] else []
@@ -139,12 +187,47 @@ except:
                 }
             }
         
-        def _demo_response(self, question):
+        def _no_data_response(self, question):
+            """Response when no data is available"""
             return {
                 "question": question,
-                "answer": "Analysis unavailable. Please check system connection.",
+                "answer": """
+**⚠️ System Configuration Required**
+
+The vector store is not properly connected. Please check:
+
+1. **Vector Store Location**: Ensure `vector_store_1768244751` is in the same directory
+2. **Collection Name**: Check if collection name is different
+3. **Permissions**: Verify read access to the vector store
+
+**📋 For Demonstration:**
+Try asking about common financial complaints like:
+- Credit card fraud issues
+- Personal loan application problems
+- Savings account fee concerns
+""",
                 "confidence": 0,
-                "confidence_level": "LOW",
+                "confidence_level": "NO_DATA",
+                "sources": [],
+                "stats": {"total_complaints": 0, "products_covered": 0, "issues_identified": 0, "companies": 0}
+            }
+        
+        def _error_response(self, question, error_msg):
+            """Response when there's an error"""
+            return {
+                "question": question,
+                "answer": f"""
+**❌ System Error**
+
+Error: {error_msg}
+
+**🔧 Troubleshooting:**
+1. Restart the application
+2. Check vector store connection
+3. Verify all dependencies are installed
+""",
+                "confidence": 0,
+                "confidence_level": "ERROR",
                 "sources": [],
                 "stats": {"total_complaints": 0, "products_covered": 0, "issues_identified": 0, "companies": 0}
             }
@@ -236,6 +319,11 @@ input:focus, textarea:focus, select:focus {
     border-color: #667eea !important;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
 }
+
+/* Status indicators */
+.status-good { color: #10b981; }
+.status-warning { color: #f59e0b; }
+.status-error { color: #ef4444; }
 """
 
 def get_confidence_color(score):
@@ -341,41 +429,58 @@ def clear_history():
 def get_stats():
     """Get system statistics"""
     if hasattr(rag_system, 'collection') and rag_system.collection:
-        count = rag_system.collection.count()
-        return f"""
-        <div class="card">
-            <h3>📊 System Statistics</h3>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-                <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{count:,}</div>
-                    <div style="color: #6b7280;">Complaint Chunks</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #10b981;">5</div>
-                    <div style="color: #6b7280;">Retrieval Limit</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">{len(query_history)}</div>
-                    <div style="color: #6b7280;">Recent Queries</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">100%</div>
-                    <div style="color: #6b7280;">Source Attribution</div>
-                </div>
+        try:
+            count = rag_system.collection.count()
+            status = "✅ Connected"
+            status_class = "status-good"
+        except:
+            count = 0
+            status = "❌ Error"
+            status_class = "status-error"
+    else:
+        count = 0
+        status = "⚠️ Not Connected"
+        status_class = "status-warning"
+    
+    return f"""
+    <div class="card">
+        <h3>📊 System Statistics</h3>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #667eea;">{count:,}</div>
+                <div style="color: #6b7280;">Complaint Chunks</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #10b981;">5</div>
+                <div style="color: #6b7280;">Retrieval Limit</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">{len(query_history)}</div>
+                <div style="color: #6b7280;">Recent Queries</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;">100%</div>
+                <div style="color: #6b7280;">Source Attribution</div>
             </div>
         </div>
-        """
-    return "<p>System statistics unavailable</p>"
+        <div style="margin-top: 1rem; padding: 1rem; background: #f9fafb; border-radius: 6px;">
+            <strong>System Status:</strong> <span class="{status_class}">{status}</span>
+            <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #6b7280;">
+                Vector Store: {'Available' if hasattr(rag_system, 'collection') and rag_system.collection else 'Not found'}
+            </div>
+        </div>
+    </div>
+    """
 
 # Create Gradio interface
-with gr.Blocks(css=css, title="Financial Complaints Analyst") as demo:
+with gr.Blocks(css=css, title="Financial Complaints Analyst", theme=gr.themes.Soft()) as demo:
     
     # Header
     gr.HTML("""
     <div class="header">
         <h1 style="margin: 0; font-size: 2.5rem;">🔍 Financial Complaints Analyst</h1>
         <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-            AI-powered analysis of 5,000+ customer complaints
+            AI-powered analysis of financial customer complaints
         </p>
         <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem;">
             <span style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 9999px;">
@@ -440,7 +545,7 @@ with gr.Blocks(css=css, title="Financial Complaints Analyst") as demo:
             """)
             
             # Sample Questions
-            with gr.Accordion("💡 Sample Questions", open=False):
+            with gr.Accordion("💡 Sample Questions", open=True):
                 gr.HTML("""
                 <div style="padding: 1rem 0;">
                     <p><strong>Product Analysis:</strong></p>
@@ -461,7 +566,10 @@ with gr.Blocks(css=css, title="Financial Complaints Analyst") as demo:
             
             # System Info
             with gr.Accordion("⚙️ System Information", open=False):
-                system_info = gr.HTML(label="System Info")
+                system_info = gr.HTML(
+                    label="System Info",
+                    value="<div class='card'><p>Click 'System Stats' to see details</p></div>"
+                )
                 raw_json = gr.JSON(label="Raw Response", visible=False)
             
             # Recent Activity
@@ -514,6 +622,16 @@ with gr.Blocks(css=css, title="Financial Complaints Analyst") as demo:
 print("\n" + "="*60)
 print("🚀 FINANCIAL COMPLAINTS ANALYST - READY TO LAUNCH")
 print("="*60)
+
+if hasattr(rag_system, 'collection') and rag_system.collection:
+    try:
+        count = rag_system.collection.count()
+        print(f"✅ System Status: Connected to {count:,} complaint chunks")
+    except:
+        print("⚠️ System Status: Collection found but count unavailable")
+else:
+    print("⚠️ System Status: Vector store not connected")
+
 print("\n📋 FEATURES:")
 print("   • Modern, professional UI design")
 print("   • Real-time complaint analysis")
@@ -530,4 +648,18 @@ print("   • Enterprise-ready design")
 print("   • Full transparency with sources")
 print("   • Business-focused insights")
 print("   • Professional analytics dashboard")
+print("\n🔧 TROUBLESHOOTING:")
+print("   • Ensure vector_store_1768244751 is in the same directory")
+print("   • Check if collection name is different")
+print("   • Try asking sample questions")
 print("\n✅ Ready for Task 4 submission!")
+
+# Launch with better error handling
+try:
+    demo.launch(server_name="0.0.0.0", server_port=7860, share=False, show_error=True)
+except Exception as e:
+    print(f"\n❌ Failed to launch: {e}")
+    print("Try:")
+    print("  1. Check if port 7860 is already in use")
+    print("  2. Run: python app.py --port 7861")
+    print("  3. Or try: demo.launch(share=True) for public link")
