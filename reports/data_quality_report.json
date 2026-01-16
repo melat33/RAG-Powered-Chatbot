@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-01-13T17:40:44.741239",
+  "dataset_info": {
+    "total_records": 452,
+    "columns": [
+      "Complaint ID",
+      "Date received",
+      "Product_Category",
+      "Issue",
+      "Company",
+      "State",
+      "Consumer complaint narrative",
+      "Cleaned_Narrative",
+      "Narrative_Length_Chars",
+      "Narrative_Length_Words"
+    ],
+    "dtypes": {
+      "Complaint ID": "object",
+      "Date received": "object",
+      "Product_Category": "object",
+      "Issue": "category",
+      "Company": "category",
+      "State": "category",
+      "Consumer complaint narrative": "object",
+      "Cleaned_Narrative": "object",
+      "Narrative_Length_Chars": "int32",
+      "Narrative_Length_Words": "int32"
+    }
+  },
+  "completeness": {
+    "Complaint ID": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Date received": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Product_Category": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Issue": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Company": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "State": {
+      "non_null": 451,
+      "null": 1,
+      "completeness_percentage": 99.78
+    },
+    "Consumer complaint narrative": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Cleaned_Narrative": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Narrative_Length_Chars": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    },
+    "Narrative_Length_Words": {
+      "non_null": 452,
+      "null": 0,
+      "completeness_percentage": 100.0
+    }
+  },
+  "summary_stats": {
+    "numeric_columns": {
+      "Narrative_Length_Chars": {
+        "count": 452.0,
+        "mean": 1262.654867256637,
+        "std": 953.2326074473477,
+        "min": 52.0,
+        "25%": 597.75,
+        "50%": 1060.0,
+        "75%": 1631.25,
+        "max": 7152.0
+      },
+      "Narrative_Length_Words": {
+        "count": 452.0,
+        "mean": 222.36725663716814,
+        "std": 164.2997169026029,
+        "min": 11.0,
+        "25%": 108.5,
+        "50%": 187.5,
+        "75%": 283.5,
+        "max": 1251.0
+      }
+    }
+  }
+}
