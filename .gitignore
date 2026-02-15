@@ -1,5 +1,7 @@
 venv/
 data/
+__pycache__/
 notebooks/reports/
 simple_embeddings/
 vector_store/
+vector_store_1768244751/
