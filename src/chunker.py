@@ -6,45 +6,30 @@ from .task2_config import CHUNK_SIZE, CHUNK_OVERLAP, CHUNKS_PATH
 def chunk_all_complaints(df):
     """Split ALL complaints into chunks"""
     print(f"\n🔪 Chunking {len(df):,} complaints...")
-    
-    # Print columns for debugging
     print(f"📋 Available columns: {df.columns.tolist()}")
     
-    # Find the narrative column - try common names
-    narrative_col = None
-    for col in df.columns:
-        col_lower = col.lower()
-        if any(term in col_lower for term in ['narrative', 'complaint', 'text', 'cleaned']):
-            narrative_col = col
-            break
+    # YOUR EXACT COLUMN NAMES from the data
+    NARRATIVE_COL = 'Consumer complaint narrative'  # ← THIS is the correct column!
+    PRODUCT_COL = 'Product_Category'  # Use the mapped category column
+    ID_COL = 'Complaint ID'
     
-    if not narrative_col:
-        # If no obvious narrative column, use the first text column
-        for col in df.columns:
-            if df[col].dtype == 'object' and len(str(df[col].iloc[0])) > 100:
-                narrative_col = col
-                break
+    print(f"📝 Using narrative column: '{NARRATIVE_COL}'")
+    print(f"🏷️ Using product column: '{PRODUCT_COL}'")
     
-    if not narrative_col:
-        narrative_col = df.columns[0]  # Fallback to first column
-        print(f"⚠️ No narrative column found, using: '{narrative_col}'")
-    else:
-        print(f"📝 Using narrative column: '{narrative_col}'")
+    # Check if columns exist
+    if NARRATIVE_COL not in df.columns:
+        print(f"❌ ERROR: '{NARRATIVE_COL}' not found!")
+        return pd.DataFrame()
     
-    # Find product column - DON'T assume 'Product_Category'
-    product_col = None
-    for col in df.columns:
-        col_lower = col.lower()
-        if any(term in col_lower for term in ['product', 'category']):
-            product_col = col
-            break
+    # Filter to rows with narratives
+    df_valid = df[df[NARRATIVE_COL].notna()].copy()
+    print(f"📊 Complaints with narratives: {len(df_valid):,}")
     
-    if not product_col:
-        product_col = df.columns[0]  # Fallback
-        print(f"⚠️ No product column found, using: '{product_col}'")
-    else:
-        print(f"🏷️ Using product column: '{product_col}'")
+    if len(df_valid) == 0:
+        print("❌ No narratives found!")
+        return pd.DataFrame()
     
+    # Initialize text splitter
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE, 
         chunk_overlap=CHUNK_OVERLAP,
@@ -52,41 +37,44 @@ def chunk_all_complaints(df):
     )
     
     chunks = []
-    total_rows = len(df)
+    total = len(df_valid)
     
-    for idx, row in df.iterrows():
-        # Get text safely
-        text = str(row[narrative_col]) if pd.notna(row[narrative_col]) else ""
-        if len(text) < 10:
+    for idx, (original_idx, row) in enumerate(df_valid.iterrows()):
+        text = str(row[NARRATIVE_COL])
+        if len(text) < 10:  # Skip very short texts
             continue
             
+        # Split into chunks
         text_chunks = splitter.split_text(text)
         
         for i, chunk in enumerate(text_chunks):
             chunks.append({
                 'chunk_id': len(chunks),
-                'complaint_id': idx,
-                'product': str(row[product_col]) if pd.notna(row[product_col]) else 'Unknown',
+                'complaint_id': int(row[ID_COL]) if ID_COL in df.columns else original_idx,
+                'product': str(row[PRODUCT_COL]) if PRODUCT_COL in df.columns else 'Unknown',
                 'chunk_index': i,
                 'total_chunks': len(text_chunks),
                 'chunk_text': chunk,
                 'chunk_length': len(chunk)
             })
         
-        # Progress update
-        if (idx + 1) % 25000 == 0:
-            print(f"  Processed {idx+1:,}/{total_rows:,} complaints ({((idx+1)/total_rows*100):.1f}%)")
+        # Progress update every 10,000 complaints
+        if (idx + 1) % 10000 == 0:
+            print(f"  Progress: {idx+1:,}/{total:,} complaints ({((idx+1)/total*100):.1f}%)")
     
+    # Create DataFrame
     chunks_df = pd.DataFrame(chunks)
-    print(f"\n✅ Created {len(chunks_df):,} chunks from {len(df):,} complaints")
-    print(f"📊 Avg chunks per complaint: {len(chunks_df)/len(df):.2f}")
+    print(f"\n✅ Created {len(chunks_df):,} chunks from {total:,} complaints")
     
-    # Show sample of product distribution
-    print(f"\n📊 Product distribution in chunks:")
-    print(chunks_df['product'].value_counts().head())
-    
-    # Save
-    chunks_df.to_parquet(CHUNKS_PATH)
-    print(f"💾 Saved: {CHUNKS_PATH}")
+    if len(chunks_df) > 0:
+        print(f"📊 Avg chunks per complaint: {len(chunks_df)/total:.2f}")
+        print(f"\n📊 Product distribution in chunks:")
+        print(chunks_df['product'].value_counts())
+        
+        # Save chunks
+        chunks_df.to_parquet(CHUNKS_PATH)
+        print(f"💾 Saved: {CHUNKS_PATH}")
+    else:
+        print("⚠️ No chunks created - check your narrative column")
     
     return chunks_df
