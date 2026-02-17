@@ -2,10 +2,11 @@
 import pandas as pd
 from .task2_config import DATA_PATH
 
+
 def load_real_data():
     """Load your ACTUAL filtered complaints from Task 1"""
     print(f"📂 Loading YOUR real data: {DATA_PATH}")
-    
+
     # Load with error handling
     try:
         df = pd.read_csv(DATA_PATH)
@@ -16,7 +17,7 @@ def load_real_data():
         print(f"❌ Error loading: {e}")
         # Try alternative encoding
         try:
-            df = pd.read_csv(DATA_PATH, encoding='latin1')
+            df = pd.read_csv(DATA_PATH, encoding="latin1")
             print(f"✅ Loaded with latin1 encoding: {len(df):,} complaints")
             print(f"📋 Columns: {df.columns.tolist()}")
             return df

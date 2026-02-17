@@ -2,9 +2,10 @@
 from datetime import datetime
 from .task2_config import CHUNK_SIZE, CHUNK_OVERLAP
 
+
 def create_final_summary(df, chunks_df, index):
     """Create final report for ALL your data"""
-    
+
     summary = f"""
 ============================================================================
 🎯 TASK 2 COMPLETED - ALL YOUR REAL DATA PROCESSED
@@ -53,6 +54,6 @@ Your {index.ntotal:,} complaint chunks are now:
 ✅ Traced back to original complaints
 """
     print(summary)
-    with open('reports/task2_final_summary.txt', 'w') as f:
+    with open("reports/task2_final_summary.txt", "w") as f:
         f.write(summary)
     return summary

@@ -3,24 +3,26 @@ Professional prompt templates for business intelligence
 """
 from typing import Dict, List
 
+
 class FinancialPrompts:
     """Business intelligence prompt templates"""
-    
+
     @staticmethod
     def format_business_context(analysis: Dict) -> str:
         """Format business context for prompts"""
         context = f"BUSINESS CONTEXT:\n"
         context += f"- Query Type: {analysis['type'].upper()}\n"
-        if analysis['products']:
+        if analysis["products"]:
             context += f"- Products: {', '.join(analysis['products'])}\n"
         context += f"- Intent: {analysis['business_intent']}\n"
-        if analysis.get('time_period'):
+        if analysis.get("time_period"):
             context += f"- Time Period: {analysis['time_period']['value']}\n"
         return context
-    
+
     @staticmethod
-    def get_executive_analyst_prompt(context: str, question: str, 
-                                   retrieved_count: int) -> str:
+    def get_executive_analyst_prompt(
+        context: str, question: str, retrieved_count: int
+    ) -> str:
         """Prompt for executive-level analysis"""
         return f"""You are the Chief Analytics Officer at CrediTrust Financial.
 

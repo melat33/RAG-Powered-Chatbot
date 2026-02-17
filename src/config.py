@@ -19,15 +19,35 @@ BUSINESS_CONTEXTS = {
     "trending": ["trend", "pattern", "increase", "decrease", "over time"],
     "comparative": ["compare", "vs", "versus", "difference", "better", "worse"],
     "root_cause": ["why", "reason", "cause", "root", "source"],
-    "volume": ["many", "often", "frequent", "common", "typical"]
+    "volume": ["many", "often", "frequent", "common", "typical"],
 }
 
 # Product categories mapping
 PRODUCT_CATEGORIES = {
     "credit card": ["Credit card", "credit card", "Credit Card", "Credit-card"],
-    "personal loan": ["Personal loan", "personal loan", "Personal Loan", "Personal-loan"],
-    "savings account": ["Savings account", "savings account", "Savings Account", "Savings-account"],
-    "money transfers": ["Money transfers", "money transfers", "Money Transfers", "Money-transfers"],
+    "personal loan": [
+        "Personal loan",
+        "personal loan",
+        "Personal Loan",
+        "Personal-loan",
+    ],
+    "savings account": [
+        "Savings account",
+        "savings account",
+        "Savings Account",
+        "Savings-account",
+    ],
+    "money transfers": [
+        "Money transfers",
+        "money transfers",
+        "Money Transfers",
+        "Money-transfers",
+    ],
     "mortgage": ["Mortgage", "mortgage", "Home loan"],
-    "checking account": ["Checking account", "checking account", "Checking Account", "Checking-account"]
+    "checking account": [
+        "Checking account",
+        "checking account",
+        "Checking Account",
+        "Checking-account",
+    ],
 }
