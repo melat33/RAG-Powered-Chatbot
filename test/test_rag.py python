@@ -1,0 +1,8 @@
+def test_rag_import():
+    from src.advanced_rag import AdvancedFinancialRAG
+    assert AdvancedFinancialRAG is not None
+
+def test_vector_store():
+    import chromadb
+    client = chromadb.PersistentClient(path="vector_store")
+    assert client is not None
