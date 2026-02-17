@@ -12,7 +12,7 @@ env:
 
 jobs:
   # ============================================================================
-  # JOB 1: TESTING (Runs on all branches)
+  # JOB 1: TESTING
   # ============================================================================
   test:
     name: Test Python ${{ matrix.python-version }}
@@ -22,148 +22,110 @@ jobs:
         python-version: ['3.9', '3.10']
     
     steps:
-    # 1. CHECKOUT CODE
-    - name: 📥 Checkout Repository
-      uses: actions/checkout@v3
-    
-    # 2. SETUP PYTHON
-    - name: 🐍 Setup Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    # 3. CACHE DEPENDENCIES
-    - name: 💾 Cache pip packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    
-    # 4. INSTALL DEPENDENCIES
-    - name: 📦 Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install wheel setuptools
-        
-        # Core testing tools
-        pip install pytest pytest-cov flake8 black mypy
-        
-        # Data science essentials
-        pip install pandas numpy matplotlib seaborn
-        
-        # ML & Vector stores
-        pip install sentence-transformers chromadb faiss-cpu
-        
-        # Jupyter ecosystem
-        pip install jupyter ipykernel ipython==8.12.0 nbformat
-        
-        # Project dependencies
-        if [ -f requirements.txt ]; then
-          pip install -r requirements.txt || echo "⚠️ Some requirements failed"
-        fi
-        
-        echo "✅ All dependencies installed"
-    
-    # 5. CREATE TEST ENVIRONMENT
-    - name: 📁 Create Test Directories
-      run: |
-        mkdir -p data/processed data/chunks
-        mkdir -p simple_embeddings vector_store
-        echo "✅ Test directories created"
-    
-    # 6. GENERATE DUMMY DATA FOR TESTS
-    - name: 📊 Generate Dummy Test Data
-      run: |
-        # Create dummy complaints data
-        if [ ! -f "data/processed/filtered_complaints.csv" ]; then
-          cat > data/processed/filtered_complaints.csv << 'EOF'
-Complaint ID,Product,Product_Category,Consumer complaint narrative,Issue,Company,State
-1,Credit Card,Credit Card,"Credit card fraud complaint",Fraud,Chase,NY
-2,Mortgage,Mortgage,"Mortgage application delayed",Delay,Wells Fargo,CA
-3,Personal Loan,Personal Loan,"Hidden fees on loan",Fees,Citibank,TX
-4,Credit Card,Credit Card,"Unauthorized transaction",Fraud,Capital One,FL
-5,Mortgage,Mortgage,"Interest rate issue",Rate,Quicken Loans,OH
-EOF
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: 🐍 Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: 💾 Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install wheel setuptools
+          pip install pytest pytest-cov flake8 black mypy
+          pip install pandas numpy matplotlib seaborn
+          pip install sentence-transformers chromadb faiss-cpu
+          pip install jupyter ipykernel ipython==8.12.0 nbformat
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt || echo "⚠️ Some requirements failed"
+          fi
+          echo "✅ All dependencies installed"
+      
+      - name: 📁 Create Test Directories
+        run: |
+          mkdir -p data/processed data/chunks
+          mkdir -p simple_embeddings vector_store
+          echo "✅ Test directories created"
+      
+      - name: 📊 Generate Dummy Test Data
+        run: |
+          # Create dummy complaints data (using echo, not heredoc)
+          echo "Complaint ID,Product,Product_Category,Consumer complaint narrative,Issue,Company,State" > data/processed/filtered_complaints.csv
+          echo "1,Credit Card,Credit Card,\"Credit card fraud complaint\",Fraud,Chase,NY" >> data/processed/filtered_complaints.csv
+          echo "2,Mortgage,Mortgage,\"Mortgage application delayed\",Delay,Wells Fargo,CA" >> data/processed/filtered_complaints.csv
+          echo "3,Personal Loan,Personal Loan,\"Hidden fees on loan\",Fees,Citibank,TX" >> data/processed/filtered_complaints.csv
+          echo "4,Credit Card,Credit Card,\"Unauthorized transaction\",Fraud,Capital One,FL" >> data/processed/filtered_complaints.csv
+          echo "5,Mortgage,Mortgage,\"Interest rate issue\",Rate,Quicken Loans,OH" >> data/processed/filtered_complaints.csv
           echo "✅ Created dummy complaints data"
-        fi
-        
-        # Create dummy chunks
-        if [ ! -f "data/chunks/all_chunks.parquet" ]; then
-          python -c "
-import pandas as pd
-import numpy as np
-df = pd.DataFrame({
-    'chunk_id': range(100),
-    'complaint_id': range(100),
-    'product': ['Credit Card'] * 50 + ['Mortgage'] * 50,
-    'chunk_text': ['Sample complaint text'] * 100,
-    'chunk_length': [50] * 100
-})
-df.to_parquet('data/chunks/all_chunks.parquet')
-print('✅ Created dummy chunks')
-"
-        fi
-    
-    # 7. CODE QUALITY CHECKS
-    - name: 🔍 Lint with flake8
-      run: |
-        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 src/ --count --exit-zero --max-complexity=10 --statistics
-    
-    - name: 🏷️ Type check with mypy
-      run: |
-        mypy src/ --ignore-missing-imports || echo "⚠️ Type checking warnings"
-    
-    # 8. RUN TESTS
-    - name: 🧪 Run Tests
-      env:
-        CI: true
-        PYTHONPATH: ${{ github.workspace }}
-      run: |
-        if [ -d "tests" ]; then
-          echo "📋 Running tests with pytest..."
-          pytest tests/ -v \
-            --cov=src \
-            --cov-report=xml \
-            --cov-report=html \
-            --cov-fail-under=0 \
-            --tb=short
-          echo "✅ Tests completed"
-        else
-          echo "📝 No tests folder found - creating placeholder"
-          mkdir -p tests
-          echo "def test_placeholder(): assert True" > tests/test_placeholder.py
-          pytest tests/ -v
-        fi
-    
-    # 9. UPLOAD ARTIFACTS
-    - name: 📤 Upload Coverage Report
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: coverage-report-${{ matrix.python-version }}
-        path: htmlcov/
-    
-    # 10. BRANCH SUMMARY
-    - name: 📈 Branch Summary
-      run: |
-        echo "═══════════════════════════════════════════"
-        echo "✅ BRANCH: ${{ github.ref_name }}"
-        echo "✅ PYTHON: ${{ matrix.python-version }}"
-        echo "✅ STATUS: Tests passed with warnings allowed"
-        echo "═══════════════════════════════════════════"
-    
-    # 11. ALWAYS PASS
-    - name: 🏁 Final Status
-      if: always()
-      run: |
-        echo "🎉 CI Pipeline completed successfully!"
-        exit 0
+          
+          # Create dummy chunks (one-liner Python command)
+          if [ ! -f "data/chunks/all_chunks.parquet" ]; then
+            python -c "import pandas as pd; import numpy as np; df = pd.DataFrame({'chunk_id': range(100), 'complaint_id': range(100), 'product': ['Credit Card'] * 50 + ['Mortgage'] * 50, 'chunk_text': ['Sample complaint text'] * 100, 'chunk_length': [50] * 100}); df.to_parquet('data/chunks/all_chunks.parquet'); print('✅ Created dummy chunks')"
+          fi
+      
+      - name: 🔍 Lint with flake8
+        run: |
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src/ --count --exit-zero --max-complexity=10 --statistics
+      
+      - name: 🏷️ Type check with mypy
+        run: |
+          mypy src/ --ignore-missing-imports || echo "⚠️ Type checking warnings"
+      
+      - name: 🧪 Run Tests
+        env:
+          CI: true
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          if [ -d "tests" ]; then
+            echo "📋 Running tests with pytest..."
+            pytest tests/ -v \
+              --cov=src \
+              --cov-report=xml \
+              --cov-report=html \
+              --cov-fail-under=0 \
+              --tb=short
+            echo "✅ Tests completed"
+          else
+            echo "📝 No tests folder found - creating placeholder"
+            mkdir -p tests
+            echo "def test_placeholder(): assert True" > tests/test_placeholder.py
+            pytest tests/ -v
+          fi
+      
+      - name: 📤 Upload Coverage Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: htmlcov/
+      
+      - name: 📈 Branch Summary
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "✅ BRANCH: ${{ github.ref_name }}"
+          echo "✅ PYTHON: ${{ matrix.python-version }}"
+          echo "✅ STATUS: Tests passed with warnings allowed"
+          echo "═══════════════════════════════════════════"
+      
+      - name: 🏁 Final Status
+        if: always()
+        run: |
+          echo "🎉 CI Pipeline completed successfully!"
+          exit 0
 
   # ============================================================================
-  # JOB 2: BUILD (Only on main branch after tests pass)
+  # JOB 2: BUILD
   # ============================================================================
   build:
     name: 📦 Build Package
@@ -172,36 +134,36 @@ print('✅ Created dummy chunks')
     if: github.ref == 'refs/heads/main' && success()
     
     steps:
-    - name: 📥 Checkout Repository
-      uses: actions/checkout@v3
-    
-    - name: 🐍 Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-    
-    - name: 📦 Build Distribution
-      run: |
-        pip install build
-        python -m build
-        echo "✅ Package built successfully"
-    
-    - name: 📤 Upload Artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: dist-${{ github.sha }}
-        path: dist/
-    
-    - name: 📋 Build Summary
-      run: |
-        echo "═══════════════════════════════════════════"
-        echo "✅ Build completed for ${{ env.PROJECT_NAME }}"
-        echo "✅ Version: ${{ github.sha }}"
-        echo "✅ Artifacts: dist/"
-        echo "═══════════════════════════════════════════"
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📦 Build Distribution
+        run: |
+          pip install build
+          python -m build
+          echo "✅ Package built successfully"
+      
+      - name: 📤 Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+      
+      - name: 📋 Build Summary
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "✅ Build completed for ${{ env.PROJECT_NAME }}"
+          echo "✅ Version: ${{ github.sha }}"
+          echo "✅ Artifacts: dist/"
+          echo "═══════════════════════════════════════════"
 
   # ============================================================================
-  # JOB 3: STATUS CHECK (Always runs, provides final status)
+  # JOB 3: STATUS CHECK
   # ============================================================================
   status:
     name: 🏆 Final Status
@@ -210,15 +172,15 @@ print('✅ Created dummy chunks')
     runs-on: ubuntu-latest
     
     steps:
-    - name: ✅ Check All Jobs
-      run: |
-        echo "═══════════════════════════════════════════"
-        echo "🏆 ${{ env.PROJECT_NAME }} CI/CD PIPELINE"
-        echo "═══════════════════════════════════════════"
-        echo ""
-        echo "📊 Branch: ${{ github.ref_name }}"
-        echo "📊 Commit: ${{ github.sha }}"
-        echo "📊 Workflow: ${{ github.workflow }}"
-        echo ""
-        echo "✅ All jobs completed"
-        echo "🎉 Ready for deployment"
+      - name: ✅ Check All Jobs
+        run: |
+          echo "═══════════════════════════════════════════"
+          echo "🏆 ${{ env.PROJECT_NAME }} CI/CD PIPELINE"
+          echo "═══════════════════════════════════════════"
+          echo ""
+          echo "📊 Branch: ${{ github.ref_name }}"
+          echo "📊 Commit: ${{ github.sha }}"
+          echo "📊 Workflow: ${{ github.workflow }}"
+          echo ""
+          echo "✅ All jobs completed"
+          echo "🎉 Ready for deployment"
