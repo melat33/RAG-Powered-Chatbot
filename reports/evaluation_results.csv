@@ -1,0 +1,5 @@
+question_id,question,confidence,retrieved,keyword_score,success
+1,What are the main complaints about credit cards?,58.6,5,1.67,False
+2,Why are customers unhappy with money transfers?,50.5,5,1.67,False
+3,Compare issues between personal loans and savings accounts,49.9,5,1.67,False
+4,How many complaints about mortgage processing delays?,39.0,5,1.25,False
